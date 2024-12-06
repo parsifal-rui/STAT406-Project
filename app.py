@@ -6,15 +6,23 @@ from nmf import NMF
 
 app = Flask(__name__)
 
-# 读取训练集和测试集
-training_faces = np.loadtxt('train.txt')
-test_faces = np.loadtxt('test.txt')
+# 读取训练集和测试集 - 修改为新的数据文件
+training_faces = np.loadtxt('pp.txt')
+test_faces = np.loadtxt('test2.txt')
+
+# 数据预处理：将像素值从0-255缩放到0-1
+training_faces = training_faces / 255.0
+test_faces = test_faces / 255.0
+
 current_index = 0
 processed_faces = None
 current_reconstructed = None
 
-# 设置误差阈值
-ERROR_THRESHOLD = 0.1  # 可以根据实际情况调整这个值
+# 设置误差阈值 - 由于数据范围改变，可能需要调整阈值
+ERROR_THRESHOLD = 0.1
+
+# 在全局变量部分添加
+image_states = {}  # 用于记录每张图片的状态
 
 def calculate_error(original, reconstructed):
     """计算重建误差"""
@@ -30,7 +38,7 @@ def index():
 
 @app.route('/process', methods=['POST'])
 def process():
-    global processed_faces, current_reconstructed
+    global processed_faces, current_reconstructed, image_states
     
     data = request.json
     algorithm = data.get('algorithm')
@@ -61,7 +69,9 @@ def process():
             'reconstructed': current_reconstructed.tolist(),
             'runtime': runtime,
             'error_rate': float(error_rate),
-            'is_face': bool(is_face(error_rate))
+            'is_face': bool(is_face(error_rate)),
+            'image_state': image_states.get(current_index, {}),
+            'total_images': len(test_faces)
         })
         
     except Exception as e:
@@ -82,7 +92,8 @@ def next_face():
         'original': test_faces[current_index].tolist(),
         'reconstructed': current_reconstructed.tolist(),
         'error_rate': float(error_rate),
-        'is_face': bool(is_face(error_rate))
+        'is_face': bool(is_face(error_rate)),
+        'image_state': image_states.get(current_index, {})  # 返回当前图片的状态
     })
 
 @app.route('/prev')
@@ -100,8 +111,23 @@ def prev_face():
         'original': test_faces[current_index].tolist(),
         'reconstructed': current_reconstructed.tolist(),
         'error_rate': float(error_rate),
-        'is_face': bool(is_face(error_rate))
+        'is_face': bool(is_face(error_rate)),
+        'image_state': image_states.get(current_index, {})  # 返回当前图片的状态
     })
+
+# 添加新的路由来更新图片状态
+@app.route('/update_state', methods=['POST'])
+def update_state():
+    data = request.json
+    index = data.get('index')
+    state = data.get('state')
+    
+    if index is not None:
+        if index not in image_states:
+            image_states[index] = {'viewed': False, 'status': None}
+        image_states[index].update(state)
+    
+    return jsonify({'success': True})
 
 if __name__ == '__main__':
     app.run(debug=True) 
