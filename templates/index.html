@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Face Reconstruction</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="panel" id="top-panel">
+        <h1>Face Reconstruction</h1>
+        <p>Welcome, user 777</p>
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <img src="/static/default-avatar.png" alt="Profile" style="width: 40px; height: 40px; border-radius: 50%;">
+            <button onclick="window.location.href='/logout'" style="background-color: #ea4335;">Logout</button>
+        </div>
+    </div>
+    
+    <div class="panel" id="control-panel">
+        <div>
+            <h2>Select Algorithm</h2>
+            <select id="algorithm">
+                <option value="pca">PCA</option>
+                <option value="nmf">NMF</option>
+                <option value="autoencoder">Autoencoder</option>
+            </select>
+        </div>
+        <div>
+            <h2>Precision (Rank)</h2>
+            <input type="number" id="rank" placeholder="1-100" min="1" max="100" value="10">
+        </div>
+        <button onclick="processImages()">Process Images</button>
+    </div>
+    
+    <div class="panel" id="display-panel">
+        <div class="stats-panel">
+            <div class="stats-box">
+                <div class="stat-value" id="total-viewed">0</div>
+                <div class="stat-label">Total Viewed</div>
+            </div>
+            <div class="stats-box">
+                <div class="stat-value" id="total-passed">0</div>
+                <div class="stat-label">Total Passed</div>
+            </div>
+            <div class="stats-box">
+                <div class="stat-value" id="total-not-passed">0</div>
+                <div class="stat-label">Total Not Passed</div>
+            </div>
+            <div class="stats-box">
+                <div class="stat-value" id="auto-result">-</div>
+                <div class="stat-label">Auto Detection Result</div>
+            </div>
+            <canvas id="stats-chart"></canvas>
+        </div>
+        
+        <div class="faces-panel">
+            <div class="face-container">
+                <div class="face-box">
+                    <h3>Original Face</h3>
+                    <canvas id="original" width="190" height="190"></canvas>
+                    <div class="button-group">
+                        <button onclick="prevFace()">Previous</button>
+                        <button onclick="nextFace()">Next</button>
+                    </div>
+                    <div class="metrics">
+                        <div class="metric">
+                            <span class="metric-label">Runtime:</span>
+                            <span class="metric-value" id="runtime">-</span>
+                        </div>
+                        <div class="metric">
+                            <span class="metric-label">Error:</span>
+                            <span class="metric-value" id="error">-</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="face-box">
+                    <h3>Reconstructed Face</h3>
+                    <canvas id="reconstructed" width="190" height="190"></canvas>
+                    <div class="button-group">
+                        <button onclick="markPass()" style="background-color: #34a853">Pass</button>
+                        <button onclick="markNotPass()" style="background-color: #ea4335">Not Pass</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function drawFace(data, canvasId) {
+            const canvas = document.getElementById(canvasId);
+            const ctx = canvas.getContext('2d');
+            
+            // 清除画布
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // 创建一个小的临时canvas来存储原始大小的图像
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = 19;
+            tempCanvas.height = 19;
+            const tempCtx = tempCanvas.getContext('2d');
+            const imageData = tempCtx.createImageData(19, 19);
+            
+            // 填充图像数据
+            for (let i = 0; i < data.length; i++) {
+                const value = data[i] * 255;
+                imageData.data[i * 4] = value;
+                imageData.data[i * 4 + 1] = value;
+                imageData.data[i * 4 + 2] = value;
+                imageData.data[i * 4 + 3] = 255;
+            }
+            
+            // 将图像数据放到临时canvas上
+            tempCtx.putImageData(imageData, 0, 0);
+            
+            // 使用图像平滑
+            ctx.imageSmoothingEnabled = false;  // 禁用平滑以保持像素清晰
+            
+            // 将临时canvas的内容绘制到主canvas上，并进行缩放
+            ctx.drawImage(
+                tempCanvas,
+                0, 0, 19, 19,  // 源图像的位置和大小
+                0, 0, canvas.width, canvas.height  // 目标位置和大小
+            );
+        }
+
+        async function processImages() {
+            const algorithm = document.getElementById('algorithm').value;
+            const rank = document.getElementById('rank').value;
+            
+            const response = await fetch('/process', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ algorithm, rank }),
+            });
+            
+            const data = await response.json();
+            updateFaces(data);
+        }
+
+        async function nextFace() {
+            const response = await fetch('/next');
+            const data = await response.json();
+            updateFaces(data);
+        }
+
+        async function prevFace() {
+            const response = await fetch('/prev');
+            const data = await response.json();
+            updateFaces(data);
+        }
+
+        let stats = {
+            viewed: 0,
+            passed: 0,
+            notPassed: 0
+        };
+        
+        let statsChart;
+        
+        // 初始化饼图
+        function initChart() {
+            const ctx = document.getElementById('stats-chart').getContext('2d');
+            statsChart = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: ['Passed', 'Not Passed', 'Pending'],
+                    datasets: [{
+                        data: [0, 0, 0],
+                        backgroundColor: [
+                            '#34a853',  // Google green
+                            '#ea4335',  // Google red
+                            '#dadce0'   // Google grey
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                padding: 20,
+                                font: {
+                                    size: 12
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // 更新统计数据
+        function updateStats() {
+            document.getElementById('total-viewed').textContent = stats.viewed;
+            document.getElementById('total-passed').textContent = stats.passed;
+            document.getElementById('total-not-passed').textContent = stats.notPassed;
+            
+            statsChart.data.datasets[0].data = [
+                stats.passed,
+                stats.notPassed,
+                stats.viewed - stats.passed - stats.notPassed
+            ];
+            statsChart.update();
+        }
+        
+        // 修改现有函数
+        function updateFaces(data) {
+            if (data.error) {
+                console.error(data.error);
+                return;
+            }
+            
+            drawFace(data.original, 'original');
+            drawFace(data.reconstructed, 'reconstructed');
+            
+            document.getElementById('runtime').textContent = 
+                data.runtime ? `${data.runtime.toFixed(3)}s` : '-';
+            document.getElementById('error').textContent = 
+                data.error_rate ? `${data.error_rate.toFixed(4)}` : '-';
+            
+            // 更新自动判断结果
+            const autoResult = document.getElementById('auto-result');
+            if (data.is_face) {
+                autoResult.textContent = 'FACE';
+                autoResult.style.color = '#34a853';  // Google green
+                // 自动标记为通过
+                stats.passed++;
+            } else {
+                autoResult.textContent = 'NOT FACE';
+                autoResult.style.color = '#ea4335';  // Google red
+                // 自动标记为不通过
+                stats.notPassed++;
+            }
+            
+            stats.viewed++;
+            updateStats();
+        }
+        
+        function markPass() {
+            stats.passed++;
+            updateStats();
+            console.log('Marked as Pass');
+        }
+        
+        function markNotPass() {
+            stats.notPassed++;
+            updateStats();
+            console.log('Marked as Not Pass');
+        }
+        
+        // 页面加载时初始化图表
+        window.onload = function() {
+            initChart();
+        };
+    </script>
+</body>
+</html> 

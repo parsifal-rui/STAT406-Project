@@ -1,0 +1,165 @@
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f0f2f5;
+    margin: 0;
+    padding: 20px;
+}
+
+.panel {
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin: 20px 0;
+    padding: 20px;
+}
+
+#top-panel {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+#top-panel h1 {
+    margin: 0;
+    color: #1a73e8;
+}
+
+#control-panel {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+#control-panel h2 {
+    font-size: 1rem;
+    margin: 0;
+    color: #5f6368;
+}
+
+select, input, button {
+    padding: 8px 16px;
+    border: 1px solid #dadce0;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+button {
+    background-color: #1a73e8;
+    color: white;
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+button:hover {
+    background-color: #1557b0;
+}
+
+#display-panel {
+    display: flex;
+    flex-direction: row;
+    gap: 20px;
+}
+
+.stats-panel {
+    flex: 1;
+    padding: 20px;
+    border-right: 1px solid #dadce0;
+    max-width: 300px;
+    height: fit-content;
+}
+
+.stats-box {
+    background-color: #f8f9fa;
+    padding: 12px;
+    border-radius: 8px;
+    margin-bottom: 12px;
+    text-align: center;
+}
+
+.stat-value {
+    font-size: 24px;
+    font-weight: bold;
+    color: #1a73e8;
+}
+
+.stat-label {
+    font-size: 14px;
+    color: #5f6368;
+    margin-top: 4px;
+}
+
+#stats-chart {
+    max-height: 200px !important;
+    width: 100% !important;
+    margin-top: 20px;
+}
+
+.faces-panel {
+    flex: 2;
+    padding: 20px;
+}
+
+.face-container {
+    display: flex;
+    justify-content: center;
+    gap: 40px;
+}
+
+.face-box {
+    background-color: #f8f9fa;
+    padding: 20px;
+    border-radius: 8px;
+    text-align: center;
+}
+
+.face-box h3 {
+    color: #202124;
+    margin-top: 0;
+    margin-bottom: 15px;
+}
+
+canvas {
+    border: 2px solid #dadce0;
+    border-radius: 4px;
+    margin-bottom: 15px;
+}
+
+.metrics {
+    margin-top: 15px;
+    padding: 10px;
+    background-color: white;
+    border: 1px solid #dadce0;
+    border-radius: 4px;
+}
+
+.metric {
+    margin: 8px 0;
+    font-size: 14px;
+}
+
+.metric-label {
+    font-weight: 500;
+    color: #5f6368;
+}
+
+.metric-value {
+    color: #1a73e8;
+}
+
+.button-group {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin-top: 15px;
+}
+
+.button-group button {
+    min-width: 80px;
+}
+
+#auto-result {
+    font-size: 28px;
+    font-weight: bold;
+    transition: color 0.3s;
+} 

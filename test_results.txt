@@ -1,0 +1,28 @@
+Reconstruction Errors:
+
+PCA:
+Rank 5: 0.015332
+Rank 10: 0.011387
+Rank 15: 0.009065
+Rank 20: 0.007509
+Rank 25: 0.006301
+Rank 30: 0.005401
+Rank 35: 0.004723
+Rank 40: 0.004173
+Rank 45: 0.003718
+Rank 50: 0.003328
+
+NMF:
+Rank 5: 0.017920
+Rank 10: 0.013982
+Rank 15: 0.011986
+Rank 20: 0.010807
+Rank 25: 0.009672
+Rank 30: 0.008874
+Rank 35: 0.008274
+Rank 40: 0.007833
+Rank 45: 0.007453
+Rank 50: 0.006822
+
+Average PCA Error: 0.007094
+Average NMF Error: 0.010362
