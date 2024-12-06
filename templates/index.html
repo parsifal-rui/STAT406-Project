@@ -85,6 +85,8 @@
     </div>
 
     <script>
+        let totalImages = 0;  // 添加全局变量
+
         function drawFace(data, canvasId) {
             const canvas = document.getElementById(canvasId);
             const ctx = canvas.getContext('2d');
@@ -92,32 +94,32 @@
             // 清除画布
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
-            // 创建一个小的临时canvas来存储原始大小的图像
+            // 创建一个临时canvas来存储原始大小的图像
             const tempCanvas = document.createElement('canvas');
-            tempCanvas.width = 19;
-            tempCanvas.height = 19;
+            tempCanvas.width = 48;  // 新的图像宽度
+            tempCanvas.height = 34; // 新的图像高度
             const tempCtx = tempCanvas.getContext('2d');
-            const imageData = tempCtx.createImageData(19, 19);
+            const imageData = tempCtx.createImageData(48, 34);
             
             // 填充图像数据
             for (let i = 0; i < data.length; i++) {
-                const value = data[i] * 255;
-                imageData.data[i * 4] = value;
-                imageData.data[i * 4 + 1] = value;
-                imageData.data[i * 4 + 2] = value;
-                imageData.data[i * 4 + 3] = 255;
+                const value = data[i] * 255; // 将0-1的值转换回0-255
+                imageData.data[i * 4] = value;     // R
+                imageData.data[i * 4 + 1] = value; // G
+                imageData.data[i * 4 + 2] = value; // B
+                imageData.data[i * 4 + 3] = 255;   // A
             }
             
             // 将图像数据放到临时canvas上
             tempCtx.putImageData(imageData, 0, 0);
             
-            // 使用图像平滑
-            ctx.imageSmoothingEnabled = false;  // 禁用平滑以保持像素清晰
+            // 禁用图像平滑以保持像素清晰
+            ctx.imageSmoothingEnabled = false;
             
-            // 将临时canvas的内容绘制到主canvas上，并进行缩放
+            // 将临时canvas的��容绘制到主canvas上，并进行缩放
             ctx.drawImage(
                 tempCanvas,
-                0, 0, 19, 19,  // 源图像的位置和大小
+                0, 0, 48, 34,  // 源图像的位置和大小
                 0, 0, canvas.width, canvas.height  // 目标位置和大小
             );
         }
@@ -135,26 +137,19 @@
             });
             
             const data = await response.json();
-            updateFaces(data);
-        }
-
-        async function nextFace() {
-            const response = await fetch('/next');
-            const data = await response.json();
-            updateFaces(data);
-        }
-
-        async function prevFace() {
-            const response = await fetch('/prev');
-            const data = await response.json();
+            if (data.total_images) {
+                totalImages = data.total_images;  // 保存总图片数
+            }
             updateFaces(data);
         }
 
         let stats = {
-            viewed: 0,
-            passed: 0,
-            notPassed: 0
+            viewed: new Set(),  // 使用Set来存储已查看的图片索引
+            passed: new Set(),  // 使用Set来存储已通过的图片索引
+            notPassed: new Set()  // 使用Set来存储未通过的图片索引
         };
+        
+        let currentIndex = 0;  // 添加当前图片索引的追踪
         
         let statsChart;
         
@@ -194,20 +189,20 @@
         
         // 更新统计数据
         function updateStats() {
-            document.getElementById('total-viewed').textContent = stats.viewed;
-            document.getElementById('total-passed').textContent = stats.passed;
-            document.getElementById('total-not-passed').textContent = stats.notPassed;
+            document.getElementById('total-viewed').textContent = stats.viewed.size;
+            document.getElementById('total-passed').textContent = stats.passed.size;
+            document.getElementById('total-not-passed').textContent = stats.notPassed.size;
             
             statsChart.data.datasets[0].data = [
-                stats.passed,
-                stats.notPassed,
-                stats.viewed - stats.passed - stats.notPassed
+                stats.passed.size,
+                stats.notPassed.size,
+                stats.viewed.size - stats.passed.size - stats.notPassed.size
             ];
             statsChart.update();
         }
         
         // 修改现有函数
-        function updateFaces(data) {
+        async function updateFaces(data) {
             if (data.error) {
                 console.error(data.error);
                 return;
@@ -225,30 +220,101 @@
             const autoResult = document.getElementById('auto-result');
             if (data.is_face) {
                 autoResult.textContent = 'FACE';
-                autoResult.style.color = '#34a853';  // Google green
-                // 自动标记为通过
-                stats.passed++;
+                autoResult.style.color = '#34a853';
             } else {
                 autoResult.textContent = 'NOT FACE';
-                autoResult.style.color = '#ea4335';  // Google red
-                // 自动标记为不通过
-                stats.notPassed++;
+                autoResult.style.color = '#ea4335';
             }
             
-            stats.viewed++;
+            // 如果这张图片之前没有被查看过，则添加到viewed集合中
+            if (!stats.viewed.has(currentIndex)) {
+                stats.viewed.add(currentIndex);
+                // 更新服务器端状态
+                await fetch('/update_state', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        index: currentIndex,
+                        state: { viewed: true }
+                    }),
+                });
+            }
+            
+            // 如果图片已有状态，恢复之前的状态
+            if (data.image_state) {
+                if (data.image_state.status === 'pass') {
+                    stats.passed.add(currentIndex);
+                } else if (data.image_state.status === 'not_pass') {
+                    stats.notPassed.add(currentIndex);
+                }
+            }
+            
             updateStats();
         }
         
-        function markPass() {
-            stats.passed++;
-            updateStats();
-            console.log('Marked as Pass');
+        // 修改markPass函数
+        async function markPass() {
+            if (!stats.passed.has(currentIndex)) {
+                // 如果之前标记为not pass，需要先移除
+                stats.notPassed.delete(currentIndex);
+                stats.passed.add(currentIndex);
+                
+                // 更新服务器端状态
+                await fetch('/update_state', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        index: currentIndex,
+                        state: { status: 'pass' }
+                    }),
+                });
+                
+                updateStats();
+            }
         }
         
-        function markNotPass() {
-            stats.notPassed++;
-            updateStats();
-            console.log('Marked as Not Pass');
+        // 修改markNotPass函数
+        async function markNotPass() {
+            if (!stats.notPassed.has(currentIndex)) {
+                // 如果之前标记为pass，需要先移除
+                stats.passed.delete(currentIndex);
+                stats.notPassed.add(currentIndex);
+                
+                // 更新服务器端状态
+                await fetch('/update_state', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        index: currentIndex,
+                        state: { status: 'not_pass' }
+                    }),
+                });
+                
+                updateStats();
+            }
+        }
+        
+        // 修改nextFace和prevFace函数
+        async function nextFace() {
+            if (!totalImages) return;  // 如果还没有处理图片，直接返回
+            const response = await fetch('/next');
+            const data = await response.json();
+            currentIndex = (currentIndex + 1) % totalImages;
+            updateFaces(data);
+        }
+        
+        async function prevFace() {
+            if (!totalImages) return;  // 如果还没有处理图片，直接返回
+            const response = await fetch('/prev');
+            const data = await response.json();
+            currentIndex = (currentIndex - 1 + totalImages) % totalImages;
+            updateFaces(data);
         }
         
         // 页面加载时初始化图表
